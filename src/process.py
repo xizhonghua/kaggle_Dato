@@ -2,9 +2,12 @@
 
 import re
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, basename
 from HTMLParser import HTMLParser
 import json
+from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+import numpy as np
 
 
 regex = re.compile('[^a-zA-Z]')
@@ -70,14 +73,20 @@ def load_dict(filename):
 def list_files():
 	print 'Listing files...'
 	
-	dirs = ['../data/0/']
+	dirs = ['../data/0/', '../data/1/', '../data/2/', '../data/3/', '../data/4/']
 	files = []
 	for d in dirs: 
 		files = files + [ join(d,f) for f in listdir(d) if isfile(join(d,f)) ]
 
+	file_index = {}
+	index = 0
+	for f in files:
+		file_index[basename(f)] = index
+		index +=1
+
 	print 'Total files:', len(files)
 
-	return files
+	return files, file_index
 
 def build_dict(files):
 	print 'Building dictionaries...'
@@ -106,11 +115,61 @@ def doc2dict(filename, tag_dict):
 		parser.feed(fp.read())
 	return parser.get_bot()
 
+def convert_train_list():
+	train_list = {}
+	with open('../data/train.csv') as fp:
+		next(fp)
+		for l in fp: 
+			items = l.split(',')
+			train_list[items[0]] = int(items[1])
+	dump_dict('../data/train_list.json', train_list)
+	return train_list
+
+def generate_train_index(file_index, train_list):
+	train_index = []
+	for filename in train_list:
+		train_index.append(file_index[filename])
+	np.save('../data/train_index', np.array(train_index))
 
 
-files = list_files()
-# build_dict(files)
-tags = load_dict('../data/tags.json')
-print 'total tags:', len(tags.keys())
+def main():
+	files, file_index = list_files()
+	#dump_dict('../data/file_index.json', file_index)
 
-print doc2dict(files[0], tags)
+	#pass
+
+	# print file_index
+
+	build_dict(files)
+
+	# train_list = convert_train_list()
+	# print train_list
+
+
+	tags = load_dict('../data/tags.json')
+	print 'total tags:', len(tags.keys())
+
+
+	D = []
+
+	index = 0
+	for f in files:
+		D.append(doc2dict(f, tags))
+		index += 1
+		if index % 100 == 0: print index, 'file(s) parsed!'
+		# if index > 1000: break
+
+	v = DictVectorizer(sparse=True)
+	X = v.fit_transform(D)
+	t = TfidfTransformer()
+	Y = t.fit_transform(X)
+
+	np.save('../data/tf', Y)
+
+	train_list = load_dict('../data/train_list.json')
+	print 'total train exmaples:', len(train_list.keys())
+
+if __name__ == "__main__":
+	main()
+
+#X = np.load('../data/tf.npy')
