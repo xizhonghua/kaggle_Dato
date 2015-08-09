@@ -134,6 +134,7 @@ def generate_train_index(file_index, train_list):
 
 def main():
 	files, file_index = list_files()
+	# np.save('../data/files', np.array(files))
 	#dump_dict('../data/file_index.json', file_index)
 
 	#pass
